@@ -3,8 +3,9 @@ LLM Gateway — FastAPI application entry point.
 """
 from contextlib import asynccontextmanager
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from prometheus_client import make_asgi_app
 from redis.asyncio import Redis
 
@@ -30,6 +31,8 @@ from gateway.api.admin.usage import router as usage_router
 settings = get_settings()
 log = structlog.get_logger()
 
+CORS_HEADERS = {"Access-Control-Allow-Origin": "*"}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,12 +40,29 @@ async def lifespan(app: FastAPI):
     log.info("gateway_starting", version="0.1.0")
 
     # Create DB tables (idempotent)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    log.info("db_tables_ready")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        log.info("db_tables_ready")
+    except Exception as e:
+        log.error("db_init_failed", error=str(e))
+        raise
 
-    # Redis — force RESP2 protocol for compatibility with Redis 3.x on Windows
-    redis = Redis.from_url(settings.redis_url, decode_responses=False, protocol=2)
+    # Redis — omit protocol= so redis-py auto-negotiates (works with Upstash SSL + local)
+    redis_kwargs = {"decode_responses": False}
+    # Only force RESP2 for local plain Redis (not Upstash SSL which handles it automatically)
+    if settings.redis_url.startswith("redis://"):
+        redis_kwargs["protocol"] = 2
+    redis = Redis.from_url(settings.redis_url, **redis_kwargs)
+
+    # Verify Redis is reachable
+    try:
+        await redis.ping()
+        log.info("redis_connected")
+    except Exception as e:
+        log.error("redis_connection_failed", error=str(e))
+        raise
+
     app.state.redis = redis
 
     # Core services
@@ -57,10 +77,14 @@ async def lifespan(app: FastAPI):
     app.state.circuit_breaker = circuit_breaker
 
     # Load provider registry from DB
-    async with AsyncSessionLocal() as db:
-        providers = await list_enabled_providers(db)
-        rebuild_from_db(providers)
-    log.info("providers_loaded", count=len(providers), names=[p.name for p in providers])
+    try:
+        async with AsyncSessionLocal() as db:
+            providers = await list_enabled_providers(db)
+            rebuild_from_db(providers)
+        log.info("providers_loaded", count=len(providers), names=[p.name for p in providers])
+    except Exception as e:
+        log.error("provider_load_failed", error=str(e))
+        raise
 
     # Build pipeline
     app.state.pipeline = GatewayPipeline(
@@ -71,13 +95,10 @@ async def lifespan(app: FastAPI):
         circuit_breaker=circuit_breaker,
     )
 
-    # Setup tracing
     setup_tracing(app)
-
     log.info("gateway_ready", host="0.0.0.0", port=8000)
     yield
 
-    # Shutdown
     await redis.aclose()
     await engine.dispose()
     log.info("gateway_shutdown")
@@ -92,7 +113,17 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# ── Middleware (applied in reverse order — last added runs first) ──────────
+# ── Global exception handler — ensures CORS headers are always present ─────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    log.error("unhandled_exception", path=request.url.path, error=str(exc))
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {type(exc).__name__}: {exc}"},
+        headers=CORS_HEADERS,
+    )
+
+# ── Middleware (last added = outermost = runs first) ───────────────────────
 app.add_middleware(AuthMiddleware)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
@@ -100,6 +131,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID", "X-Gateway-Provider"],
 )
 
 # ── Routes ─────────────────────────────────────────────────────────────────
@@ -115,8 +147,4 @@ app.mount("/metrics", metrics_app)
 
 @app.get("/health", tags=["health"])
 async def health():
-    return {
-        "status": "ok",
-        "service": "llm-gateway",
-        "version": "0.1.0",
-    }
+    return {"status": "ok", "service": "llm-gateway", "version": "0.1.0"}
