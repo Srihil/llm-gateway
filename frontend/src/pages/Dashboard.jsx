@@ -47,19 +47,25 @@ export default function Dashboard() {
   const [budget, setBudget] = useState([])
   const [usage, setUsage] = useState([])
   const [metrics, setMetrics] = useState("")
-  const [online, setOnline] = useState(null)
+  const [online, setOnline] = useState(null)  // null=connecting, true=online, false=offline
+  const [failCount, setFailCount] = useState(0)
   const [lastRefresh, setLastRefresh] = useState(null)
 
   async function load() {
-    // Health check is independent — determines online/offline dot
+    // Health check — only mark offline after 3 consecutive failures
+    // so a sleeping free-tier backend shows "Waking up..." instead of "offline"
     try {
       await getHealth()
       setOnline(true)
+      setFailCount(0)
     } catch {
-      setOnline(false)
+      setFailCount(prev => {
+        const next = prev + 1
+        if (next >= 3) setOnline(false)
+        return next
+      })
     }
 
-    // Admin data is independent — a wrong admin key just returns empty arrays
     const [p, b, u, m] = await Promise.all([
       getProviders(), getBudget(), getUsageByTeam(24), getMetrics(),
     ])
@@ -99,12 +105,16 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           {lastRefresh && <span className="text-[#444] text-xs">Updated {lastRefresh}</span>}
           <span className={`flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border ${
-            online === true ? "border-green-500/30 bg-green-500/10 text-green-400" :
+            online === true  ? "border-green-500/30 bg-green-500/10 text-green-400" :
             online === false ? "border-red-500/30 bg-red-500/10 text-red-400" :
-            "border-[#333] text-[#555]"
+            "border-yellow-500/30 bg-yellow-500/10 text-yellow-400"
           }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${online ? "bg-green-400" : "bg-red-400"}`} />
-            {online === true ? "Gateway online" : online === false ? "Gateway offline" : "Connecting..."}
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              online === true ? "bg-green-400" : online === false ? "bg-red-400" : "bg-yellow-400 animate-pulse"
+            }`} />
+            {online === true  ? "Gateway online" :
+             online === false ? "Gateway offline" :
+             failCount === 0  ? "Connecting..." : "Waking up..."}
           </span>
         </div>
       </div>
