@@ -52,28 +52,29 @@ export default function Dashboard() {
   const [lastRefresh, setLastRefresh] = useState(null)
 
   async function load() {
-    // Health check — only mark offline after 3 consecutive failures
-    // so a sleeping free-tier backend shows "Waking up..." instead of "offline"
-    try {
-      await getHealth()
+    const [isOnline, p, b, u, m] = await Promise.all([
+      getHealth(),
+      getProviders(), getBudget(), getUsageByTeam(24), getMetrics(),
+    ])
+
+    setProviders(p)
+    setBudget(b)
+    setUsage(u)
+    setMetrics(m)
+    setLastRefresh(new Date().toLocaleTimeString())
+
+    // If health check passed OR data loaded (providers/budget), backend is online
+    const backendReachable = isOnline || p.length > 0 || b.length > 0
+    if (backendReachable) {
       setOnline(true)
       setFailCount(0)
-    } catch {
+    } else {
       setFailCount(prev => {
         const next = prev + 1
         if (next >= 3) setOnline(false)
         return next
       })
     }
-
-    const [p, b, u, m] = await Promise.all([
-      getProviders(), getBudget(), getUsageByTeam(24), getMetrics(),
-    ])
-    setProviders(p)
-    setBudget(b)
-    setUsage(u)
-    setMetrics(m)
-    setLastRefresh(new Date().toLocaleTimeString())
   }
 
   useEffect(() => {

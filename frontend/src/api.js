@@ -11,8 +11,12 @@ export const TEAM_KEYS = {
 }
 
 export async function getHealth() {
-  const r = await fetch(`${BASE}/health`)
-  return r.json()
+  try {
+    const r = await fetch(`${BASE}/health`, { signal: AbortSignal.timeout(8000) })
+    return r.ok
+  } catch {
+    return false
+  }
 }
 
 // Safe fetch: always returns an array, never throws on 4xx/5xx
