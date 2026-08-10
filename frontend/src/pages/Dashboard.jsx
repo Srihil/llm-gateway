@@ -51,19 +51,23 @@ export default function Dashboard() {
   const [lastRefresh, setLastRefresh] = useState(null)
 
   async function load() {
+    // Health check is independent — determines online/offline dot
     try {
-      const [p, b, u, m] = await Promise.all([
-        getProviders(), getBudget(), getUsageByTeam(24), getMetrics(),
-      ])
-      setProviders(p)
-      setBudget(b)
-      setUsage(u)
-      setMetrics(m)
+      await getHealth()
       setOnline(true)
-      setLastRefresh(new Date().toLocaleTimeString())
     } catch {
       setOnline(false)
     }
+
+    // Admin data is independent — a wrong admin key just returns empty arrays
+    const [p, b, u, m] = await Promise.all([
+      getProviders(), getBudget(), getUsageByTeam(24), getMetrics(),
+    ])
+    setProviders(p)
+    setBudget(b)
+    setUsage(u)
+    setMetrics(m)
+    setLastRefresh(new Date().toLocaleTimeString())
   }
 
   useEffect(() => {

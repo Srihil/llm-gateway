@@ -15,29 +15,36 @@ export async function getHealth() {
   return r.json()
 }
 
+// Safe fetch: always returns an array, never throws on 4xx/5xx
+async function safeArray(url, options) {
+  try {
+    const r = await fetch(url, options)
+    if (!r.ok) return []
+    const data = await r.json()
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
 export async function getProviders() {
-  const r = await fetch(`${BASE}/admin/providers`, { headers: adminHeaders })
-  return r.json()
+  return safeArray(`${BASE}/admin/providers`, { headers: adminHeaders })
 }
 
 export async function getBudget() {
-  const r = await fetch(`${BASE}/admin/usage/budget`, { headers: adminHeaders })
-  return r.json()
+  return safeArray(`${BASE}/admin/usage/budget`, { headers: adminHeaders })
 }
 
 export async function getUsageByTeam(hours = 24) {
-  const r = await fetch(`${BASE}/admin/usage/by-team?since_hours=${hours}`, { headers: adminHeaders })
-  return r.json()
+  return safeArray(`${BASE}/admin/usage/by-team?since_hours=${hours}`, { headers: adminHeaders })
 }
 
 export async function getUsageByProvider(hours = 24) {
-  const r = await fetch(`${BASE}/admin/usage/by-provider?since_hours=${hours}`, { headers: adminHeaders })
-  return r.json()
+  return safeArray(`${BASE}/admin/usage/by-provider?since_hours=${hours}`, { headers: adminHeaders })
 }
 
 export async function getTeams() {
-  const r = await fetch(`${BASE}/admin/teams`, { headers: adminHeaders })
-  return r.json()
+  return safeArray(`${BASE}/admin/teams`, { headers: adminHeaders })
 }
 
 export async function getMetrics() {
