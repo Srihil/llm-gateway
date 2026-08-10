@@ -6,7 +6,7 @@ services:
     plan: free
     region: oregon
     buildCommand: pip install -e . && pip uninstall -y hiredis || true
-    startCommand: python scripts/seed.py && uvicorn gateway.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn gateway.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL

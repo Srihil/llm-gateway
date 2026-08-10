@@ -23,6 +23,7 @@ from gateway.middleware.request_id import RequestIDMiddleware
 from gateway.observability.logging import setup_logging
 from gateway.observability.tracing import setup_tracing
 from gateway.providers.registry import rebuild_from_db
+from gateway.seed import auto_seed
 from gateway.api.v1.chat import router as chat_router
 from gateway.api.admin.teams import router as teams_router
 from gateway.api.admin.providers import router as providers_router
@@ -78,6 +79,13 @@ async def lifespan(app: FastAPI):
     app.state.budget_enforcer = budget_enforcer
     app.state.cache = cache
     app.state.circuit_breaker = circuit_breaker
+
+    # Auto-seed teams and providers on first run (safe to run multiple times)
+    try:
+        async with AsyncSessionLocal() as db:
+            await auto_seed(db)
+    except Exception as e:
+        log.warning("auto_seed_failed", error=str(e))  # non-fatal
 
     # Load provider registry from DB
     try:
