@@ -49,23 +49,28 @@ async def lifespan(app: FastAPI):
         log.error("db_init_failed", error=str(e))
         raise
 
-    # Redis — Upstash uses rediss:// (SSL). hiredis has SSL compat issues so we
-    # use the pure-Python parser by omitting hiredis from deps, and disable
-    # cert verification which Upstash requires (ssl_cert_reqs=None).
-    redis_kwargs: dict = {"decode_responses": False}
-    if settings.redis_url.startswith("rediss://"):
-        redis_kwargs["ssl_cert_reqs"] = None  # Upstash SSL fix
-    else:
-        redis_kwargs["protocol"] = 2  # Local Redis 3.x on Windows needs RESP2
-    redis = Redis.from_url(settings.redis_url, **redis_kwargs)
+    # Normalise Redis URL: Upstash requires SSL (rediss://).
+    # Auto-upgrade redis:// → rediss:// if the host is Upstash.
+    redis_url = settings.redis_url
+    if "upstash.io" in redis_url and redis_url.startswith("redis://"):
+        redis_url = "rediss://" + redis_url[len("redis://"):]
+        log.info("redis_url_upgraded_to_ssl")
 
-    # Verify Redis is reachable
+    redis_kwargs: dict = {"decode_responses": False}
+    if redis_url.startswith("rediss://"):
+        redis_kwargs["ssl_cert_reqs"] = None  # Upstash: skip cert verification
+    else:
+        redis_kwargs["protocol"] = 2           # Local Redis 3.x needs RESP2
+
+    redis = Redis.from_url(redis_url, **redis_kwargs)
+
+    # Verify Redis is reachable (non-fatal — app starts even if Redis is down)
     try:
         await redis.ping()
         log.info("redis_connected")
     except Exception as e:
-        log.error("redis_connection_failed", error=str(e))
-        raise
+        log.warning("redis_ping_failed", error=str(e),
+                    hint="rate limiting and caching will not work until Redis is reachable")
 
     app.state.redis = redis
 
