@@ -1,0 +1,64 @@
+{
+  "title": "LLM Gateway",
+  "uid": "llm-gateway",
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "type": "stat", "title": "Request Rate (req/s)",
+      "targets": [{ "expr": "rate(llm_gateway_requests_total[1m])", "legendFormat": "req/s" }]
+    },
+    {
+      "id": 2, "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "type": "stat", "title": "Error Rate (%)",
+      "targets": [{ "expr": "100 * rate(llm_gateway_requests_total{status='error'}[1m]) / rate(llm_gateway_requests_total[1m])", "legendFormat": "errors %" }]
+    },
+    {
+      "id": 3, "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "type": "stat", "title": "Cache Hit Rate (%)",
+      "targets": [{ "expr": "100 * rate(llm_gateway_cache_hits_total[5m]) / rate(llm_gateway_requests_total[5m])", "legendFormat": "cache %" }]
+    },
+    {
+      "id": 4, "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "type": "stat", "title": "Rate Limit Rejections",
+      "targets": [{ "expr": "rate(llm_gateway_rate_limit_rejections_total[1m])", "legendFormat": "rejected/s" }]
+    },
+    {
+      "id": 5, "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "type": "timeseries", "title": "Request Latency (p50 / p95 / p99)",
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(llm_gateway_request_duration_seconds_bucket[2m]))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, rate(llm_gateway_request_duration_seconds_bucket[2m]))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, rate(llm_gateway_request_duration_seconds_bucket[2m]))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 6, "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "type": "timeseries", "title": "Requests by Provider",
+      "targets": [{ "expr": "rate(llm_gateway_requests_total[1m])", "legendFormat": "{{provider}}" }]
+    },
+    {
+      "id": 7, "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "type": "timeseries", "title": "Token Consumption by Team",
+      "targets": [{ "expr": "rate(llm_gateway_tokens_total[5m])", "legendFormat": "{{team}} {{token_type}}" }]
+    },
+    {
+      "id": 8, "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "type": "timeseries", "title": "Circuit Breaker State",
+      "description": "0=CLOSED 1=HALF_OPEN 2=OPEN",
+      "targets": [{ "expr": "llm_gateway_circuit_breaker_state", "legendFormat": "{{provider}}" }]
+    },
+    {
+      "id": 9, "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "type": "timeseries", "title": "Provider Fallbacks",
+      "targets": [{ "expr": "rate(llm_gateway_provider_fallbacks_total[5m])", "legendFormat": "{{from_provider}} → {{to_provider}}" }]
+    },
+    {
+      "id": 10, "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "type": "bargauge", "title": "Budget Used by Team (%)",
+      "targets": [{ "expr": "100 * llm_gateway_budget_used_ratio", "legendFormat": "{{team}}" }]
+    }
+  ]
+}
