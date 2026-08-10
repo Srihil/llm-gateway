@@ -5,7 +5,7 @@ services:
     env: python
     plan: free
     region: oregon
-    buildCommand: pip install -e . && pip uninstall -y hiredis || true
+    buildCommand: pip install -e . && (pip uninstall -y hiredis || true)
     startCommand: uvicorn gateway.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
