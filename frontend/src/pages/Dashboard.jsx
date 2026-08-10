@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
-import { getProviders, getBudget, getUsageByTeam, getMetrics, parseMetric } from "../api"
+import { getHealth, getProviders, getBudget, getUsageByTeam, getMetrics, parseMetric } from "../api"
 
 function StatCard({ label, value, sub, color = "text-green-400" }) {
   return (
