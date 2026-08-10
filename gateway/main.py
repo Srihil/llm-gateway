@@ -48,11 +48,14 @@ async def lifespan(app: FastAPI):
         log.error("db_init_failed", error=str(e))
         raise
 
-    # Redis — omit protocol= so redis-py auto-negotiates (works with Upstash SSL + local)
-    redis_kwargs = {"decode_responses": False}
-    # Only force RESP2 for local plain Redis (not Upstash SSL which handles it automatically)
-    if settings.redis_url.startswith("redis://"):
-        redis_kwargs["protocol"] = 2
+    # Redis — Upstash uses rediss:// (SSL). hiredis has SSL compat issues so we
+    # use the pure-Python parser by omitting hiredis from deps, and disable
+    # cert verification which Upstash requires (ssl_cert_reqs=None).
+    redis_kwargs: dict = {"decode_responses": False}
+    if settings.redis_url.startswith("rediss://"):
+        redis_kwargs["ssl_cert_reqs"] = None  # Upstash SSL fix
+    else:
+        redis_kwargs["protocol"] = 2  # Local Redis 3.x on Windows needs RESP2
     redis = Redis.from_url(settings.redis_url, **redis_kwargs)
 
     # Verify Redis is reachable
