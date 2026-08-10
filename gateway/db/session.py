@@ -4,10 +4,14 @@ from gateway.config import get_settings
 
 settings = get_settings()
 
+# Render's managed Postgres requires SSL; detect by checking URL host
+_ssl = {"ssl": "require"} if "render.com" in settings.database_url else {}
+
 engine = create_async_engine(
     settings.database_url,
-    pool_size=10,
-    max_overflow=20,
+    connect_args=_ssl,
+    pool_size=5,
+    max_overflow=10,
     echo=settings.debug,
 )
 

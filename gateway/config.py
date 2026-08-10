@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Optional
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,9 +12,27 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: str = "INFO"
 
-    # Database
+    # Database — Render provides postgres:// which needs normalising for SQLAlchemy
     database_url: str = "postgresql+asyncpg://gateway:gateway@localhost:5432/llm_gateway"
     database_sync_url: str = "postgresql+psycopg2://gateway:gateway@localhost:5432/llm_gateway"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalise_async_url(cls, v: str) -> str:
+        if v.startswith("postgres://"):
+            v = "postgresql+asyncpg://" + v[len("postgres://"):]
+        elif v.startswith("postgresql://") and "+asyncpg" not in v:
+            v = "postgresql+asyncpg://" + v[len("postgresql://"):]
+        return v
+
+    @field_validator("database_sync_url", mode="before")
+    @classmethod
+    def normalise_sync_url(cls, v: str) -> str:
+        if v.startswith("postgres://"):
+            v = "postgresql+psycopg2://" + v[len("postgres://"):]
+        elif v.startswith("postgresql://") and "+psycopg2" not in v:
+            v = "postgresql+psycopg2://" + v[len("postgresql://"):]
+        return v
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"

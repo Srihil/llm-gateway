@@ -1,5 +1,6 @@
-const BASE = "http://127.0.0.1:8000"
-const ADMIN_KEY = "admin-secret-change-in-production"
+// VITE_API_URL is set at build time on Render; falls back to local dev gateway
+const BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
+const ADMIN_KEY = import.meta.env.VITE_ADMIN_KEY || "admin-secret-change-in-production"
 
 const adminHeaders = { "X-Admin-Key": ADMIN_KEY, "Content-Type": "application/json" }
 
