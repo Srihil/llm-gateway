@@ -92,3 +92,68 @@ export async function resetCB(id) {
   const r = await fetch(`${BASE}/admin/providers/${id}/reset-circuit-breaker`, { method: "POST", headers: adminHeaders })
   return r.json()
 }
+
+export async function createTeam(body) {
+  const r = await fetch(`${BASE}/admin/teams`, {
+    method: "POST",
+    headers: adminHeaders,
+    body: JSON.stringify(body),
+  })
+  const data = await r.json()
+  if (!r.ok) throw new Error(data.detail || "Failed to create team")
+  return data
+}
+
+export async function updateTeam(id, body) {
+  const r = await fetch(`${BASE}/admin/teams/${id}`, {
+    method: "PATCH",
+    headers: adminHeaders,
+    body: JSON.stringify(body),
+  })
+  const data = await r.json()
+  if (!r.ok) throw new Error(data.detail || "Failed to update team")
+  return data
+}
+
+export async function deleteTeam(id) {
+  const r = await fetch(`${BASE}/admin/teams/${id}`, { method: "DELETE", headers: adminHeaders })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error(data.detail || "Failed to delete team")
+  }
+}
+
+export async function toggleTeamStatus(id, isActive) {
+  const action = isActive ? "activate" : "deactivate"
+  const r = await fetch(`${BASE}/admin/teams/${id}/${action}`, { method: "PATCH", headers: adminHeaders })
+  return r.json()
+}
+
+export async function rotateTeamKey(id) {
+  const r = await fetch(`${BASE}/admin/teams/${id}/rotate-key`, { method: "POST", headers: adminHeaders })
+  const data = await r.json()
+  if (!r.ok) throw new Error(data.detail || "Failed to rotate key")
+  return data
+}
+
+export async function login({ email, password }) {
+  const r = await fetch(`${BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  })
+  const data = await r.json()
+  if (!r.ok) throw new Error(data.detail || "Login failed")
+  return data
+}
+
+export async function signup({ email, username, password }) {
+  const r = await fetch(`${BASE}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, username, password }),
+  })
+  const data = await r.json()
+  if (!r.ok) throw new Error(data.detail || "Signup failed")
+  return data
+}

@@ -2,10 +2,10 @@ import hashlib
 import uuid
 from decimal import Decimal
 from typing import Optional
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from gateway.db.models import Team, TeamPolicy
+from gateway.db.models import BudgetUsage, Team, TeamPolicy, UsageRecord
 
 
 def _hash_key(api_key: str) -> str:
@@ -83,3 +83,31 @@ async def rotate_api_key(db: AsyncSession, team_id: uuid.UUID, new_api_key: str)
     )
     await db.commit()
     return result.rowcount > 0
+
+
+async def update_team_full(
+    db: AsyncSession,
+    team_id: uuid.UUID,
+    fields: dict,
+) -> Optional[Team]:
+    team_fields = {k: v for k, v in fields.items() if k in ("monthly_budget_usd",)}
+    policy_fields = {k: v for k, v in fields.items() if k in ("max_rpm", "max_tpm", "routing_strategy")}
+
+    if team_fields:
+        await db.execute(update(Team).where(Team.id == team_id).values(**team_fields))
+    if policy_fields:
+        await db.execute(update(TeamPolicy).where(TeamPolicy.team_id == team_id).values(**policy_fields))
+    await db.commit()
+    return await get_team_by_id(db, team_id)
+
+
+async def delete_team(db: AsyncSession, team_id: uuid.UUID) -> bool:
+    team = await get_team_by_id(db, team_id)
+    if not team:
+        return False
+    # Remove child records that lack DB-level cascade
+    await db.execute(delete(UsageRecord).where(UsageRecord.team_id == team_id))
+    await db.execute(delete(BudgetUsage).where(BudgetUsage.team_id == team_id))
+    await db.execute(delete(Team).where(Team.id == team_id))
+    await db.commit()
+    return True

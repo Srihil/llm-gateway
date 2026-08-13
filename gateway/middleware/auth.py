@@ -16,7 +16,7 @@ log = structlog.get_logger()
 
 # These paths skip auth
 _PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
-_PUBLIC_PREFIXES = ("/metrics",)
+_PUBLIC_PREFIXES = ("/metrics", "/auth/")
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

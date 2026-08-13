@@ -104,7 +104,43 @@ async def rotate_api_key(team_id: uuid.UUID, db: AsyncSession = Depends(get_db))
     return {"api_key": new_key}
 
 
+class UpdateTeamRequest(BaseModel):
+    monthly_budget_usd: Optional[Decimal] = None
+    max_rpm: Optional[int] = None
+    max_tpm: Optional[int] = None
+    routing_strategy: Optional[str] = None
+
+
+@router.patch("/{team_id}", response_model=TeamSummary, dependencies=[Depends(_require_admin)])
+async def update_team(team_id: uuid.UUID, body: UpdateTeamRequest, db: AsyncSession = Depends(get_db)):
+    team = await teams_repo.get_team_by_id(db, team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    updated = await teams_repo.update_team_full(db, team_id, body.model_dump(exclude_none=True))
+    return TeamSummary(
+        id=str(updated.id),
+        name=updated.name,
+        monthly_budget_usd=updated.monthly_budget_usd,
+        is_active=updated.is_active,
+        max_rpm=updated.policy.max_rpm if updated.policy else 0,
+        routing_strategy=updated.policy.routing_strategy if updated.policy else "priority",
+    )
+
+
 @router.patch("/{team_id}/deactivate", dependencies=[Depends(_require_admin)])
 async def deactivate_team(team_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     await teams_repo.update_team(db, team_id, is_active=False)
     return {"status": "deactivated"}
+
+
+@router.patch("/{team_id}/activate", dependencies=[Depends(_require_admin)])
+async def activate_team(team_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    await teams_repo.update_team(db, team_id, is_active=True)
+    return {"status": "activated"}
+
+
+@router.delete("/{team_id}", status_code=204, dependencies=[Depends(_require_admin)])
+async def delete_team(team_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    ok = await teams_repo.delete_team(db, team_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Team not found")

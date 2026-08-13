@@ -28,6 +28,7 @@ from gateway.api.v1.chat import router as chat_router
 from gateway.api.admin.teams import router as teams_router
 from gateway.api.admin.providers import router as providers_router
 from gateway.api.admin.usage import router as usage_router
+from gateway.api.auth import router as auth_router
 
 settings = get_settings()
 log = structlog.get_logger()
@@ -151,6 +152,7 @@ app.add_middleware(
 )
 
 # ── Routes ─────────────────────────────────────────────────────────────────
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(chat_router, prefix="/v1", tags=["completions"])
 app.include_router(teams_router, prefix="/admin/teams", tags=["admin"])
 app.include_router(providers_router, prefix="/admin/providers", tags=["admin"])
